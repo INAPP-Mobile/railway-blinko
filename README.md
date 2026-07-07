@@ -1,10 +1,10 @@
 # Deploy and Host
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/blinko)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.com/new/template/blinko)
 
-> **Canonical code:** `blinko` — deploy URL: https://railway.app/template/blinko
+> **Canonical code:** `blinko` — deploy URL: https://railway.com/new/template/blinko
 
-![OG Image](og-image.svg)
+![OG Image](https://raw.githubusercontent.com/INAPP-Mobile/railway-blinko/main/og-image.svg)
 
 Blinko is an AI-powered, card-based note-taking app with RAG (Retrieval-Augmented Generation). Capture ideas, chat with your notes, and let AI help you connect thoughts — all self-hosted on Railway.
 

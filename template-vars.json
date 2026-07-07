@@ -1,0 +1,17 @@
+{
+  "DATABASE_URL": {
+    "defaultValue": "${{Postgres.DATABASE_URL}}",
+    "description": "PostgreSQL connection string. Add a Railway Postgres service to auto-inject.",
+    "isOptional": false
+  },
+  "NEXTAUTH_SECRET": {
+    "defaultValue": "${{secret(32)}}",
+    "description": "Random secret for authentication encryption. Auto-generated on first deploy.",
+    "isOptional": false
+  },
+  "NEXTAUTH_URL": {
+    "defaultValue": "",
+    "description": "Public URL of your Blinko instance (e.g., https://your-app.up.railway.app). Required for auth callbacks.",
+    "isOptional": false
+  }
+}

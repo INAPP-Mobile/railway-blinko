@@ -1,11 +1,15 @@
 #!/bin/sh
 # Railway-specific startup wrapper for blinko (docker.io/blinkospace/blinko:1.8.8).
 #
-# Chain (2026-07-09 — trace instrumentation was rolled back on 2026-07-09T2245):
+# Chain (2026-07-09):
 #   1. npx prisma migrate deploy
 #   2. node /app/blinko-bootstrap.js  (idempotent UPSERT isAllowRegister=true)
 #   3. node server/seed.js            (upstream seed)
-#   4. exec node server/index.js      (upstream main server)
+#   4. exec node --require /app/blinko-bypass-handler.js server/index.js
+#        bypass-handler.js is HTTP-level monkey-patch on http.Server emit
+#        that returns a tRPC-shaped response for /api/trpc/user.canRegister.
+#        Required because upstream blinko 1.8.8's published image lacks
+#        app/src/app/api/trpc/[trpc]/route.ts.
 
 set -e
 
@@ -19,5 +23,5 @@ node /app/blinko-bootstrap.js
 echo "[railway-blinko] step 3/4: seed"
 node server/seed.js
 
-echo "[railway-blinko] step 4/4: server"
-exec node server/index.js
+echo "[railway-blinko] step 4/4: server (with HTTP bypass preload)"
+exec node --require /app/blinko-bypass-handler.js server/index.js

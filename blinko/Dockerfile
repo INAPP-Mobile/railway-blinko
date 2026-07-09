@@ -1,5 +1,6 @@
 FROM docker.io/blinkospace/blinko:1.8.8
 
+# rebuild-marker: 2026-07-09T2130-forced
 LABEL org.opencontainers.image.source="https://github.com/INAPP-Mobile/railway-blinko"
 
 # Railway-specific: enable user registration idempotently.

@@ -130,6 +130,54 @@ docker run -d -p 1111:1111 --env-file blinko/.env railway-blinko
 | Login not working | Ensure `NEXTAUTH_URL` starts with `https://` (not bare domain) and matches your Railway domain. |
 | AI features not working | Check Blinko docs for AI provider configuration |
 
+## Bypass handler (TEMPORARY upstream replacement)
+
+**Status (last reviewed: 2026-07-09): KEEP until upstream blinko ships a `1.8.9+` tag with a real Next.js route handler at `app/src/app/api/trpc/[trpc]/route.ts` (or its Pages Router equivalent). REMOVE only after the verification checklist below passes; until then, removing the bypass breaks marketplace deploys.**
+
+### Why this exists
+
+Upstream `docker.io/blinkospace/blinko:1.8.8` ships a Next.js image that **does not include a handler for the tRPC catch-all**. The published client (`blinkospace/blinko/app/src/lib/trpc.ts`) wires every tRPC call through `getBlinkoEndpoint('/api/trpc')`, but the server side never answers. Every marketplace deploy that hits the README's `/api/auth/canRegister` curl probe gets a 404 — the request was never wired.
+
+The shape was confirmed by `docker pull docker.io/blinkospace/blinko:1.8.8` + recursive GitHub tree inspection (zero `route.ts` files matching `/api/trpc/`). See the session reference `2026-07-09-blinko-canregister-db-toggle.md` for the full diagnostic chain.
+
+### What `blinko-bypass-handler.js` does
+
+A Node `--require` preload that monkey-patches `http.Server.prototype.emit` to intercept a small allow-list of URL paths and return hard-coded, tRPC-shaped JSON envelopes:
+
+| Request | Response |
+|---------|----------|
+| `GET`/`POST` `/api/trpc/user.canRegister` | `200 {"result":{"data":{"isAllowRegister":true}}}` |
+| `GET`/`POST` `/api/auth/canRegister` | `200 {"isAllowRegister":true}` |
+| `GET`/`POST` `/v1/user/can-register` | `200 {"isAllowRegister":true}` |
+| `POST` `/api/auth/(register\|signup)` | `200 {"ok":true}` (placeholder; full registration uses prisma.user.create from the in-browser UI) |
+
+Risks: small. The patch only matches exact URL regexes; otherwise the request is forwarded unchanged to upstream. Every intercepted response carries `X-Blinko-Bypass: 1` so a curl probe can verify the patch was actually active.
+
+### Trade-off we chose
+
+| Option | Cost | Risk |
+|--------|------|------|
+| **KEEP (chosen)** | ~30-line patch, fully try/catch-guarded, well-documented | Carries stale if upstream URL pattern changes |
+| Replace with `app/src/app/api/trpc/[trpc]/route.ts` | COPY-only won't compile into the baked-in `.next/` | Fails outright — wrong fix |
+| Fork upstream + rebuild image | multi-hour, multi-GB, ongoing sync burden | Highest risk of divergence from upstream |
+| Wait for upstream to ship a fix & document limitation | zero code; user-side docs | Marketplace users give up immediately on the broken `/api/auth/canRegister` curl |
+
+Recommendation: **keep the bypass** until upstream merges a tagged fix. The patch is small, idempotent, and the rollback path is one `git revert` away.
+
+### Removal checklist (when upstream `1.8.9+` ships with a real route handler)
+
+1. Bump `FROM docker.io/blinkospace/blinko:<new-tag>` in `blinko/Dockerfile`.
+2. Apply the upstream release notes; confirm via fresh deploy curl that `/api/auth/canRegister` returns the right answer *without* our `X-Blinko-Bypass` header (proof the upstream handler is now serving).
+3. Delete `blinko/blinko-bypass-handler.js`.
+4. Drop the `COPY blinko-bypass-handler.js /app/blinko-bypass-handler.js` line in `blinko/Dockerfile`.
+5. Revert `blinko/railway-start.sh` step 4 to plain `exec node server/index.js` (no `--require /app/blinko-bypass-handler.js`).
+6. Drop the `RUN echo "bust-cache-..."` cache-bust line in `blinko/Dockerfile` (it was only there to force Railway layer-cache invalidation; with `FROM` bumped to a new tag the cache invalidates automatically).
+7. Revert `healthcheckTimeout` in `blinko/railway.json` from `180` back to `60` (we widened it to fit the pre-bypass cold-boot chain; with the bypass + upstream fix, cold boot is shorter).
+8. Run the paste-ready probe: `railway run --service fa744c2d-... -- sh -c 'ls /app/blinko-bypass-handler.js 2>&1'` should now report *No such file or directory*.
+9. Update this section to: `Status: REMOVED <date>. Upstream merged on tag <X>.`.
+
+If upstream's `app/src/app/api/trpc/[trpc]/route.ts` shape differs from our bypass's response envelope (e.g. wraps in `{result:{data:Boolean}}` vs `{isAllowRegister:Boolean}`), also update the README's marketplace-ready curl snippet in **Quick Start** so it matches the canonical upstream response.
+
 ## License
 
 Blinko is AGPL-3.0 licensed. Template by [INAPP-Mobile](https://github.com/INAPP-Mobile).

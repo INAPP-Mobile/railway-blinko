@@ -60,11 +60,19 @@
       // ignore disconnect errors
     }
   }
-}).finally(() => {
+})().finally(() => {
   // Force-exit AFTER the IIFE chain finishes (UPSERT + finally + disconnect).
-  // CRITICAL: a top-level `process.exit(0)` here would kill the script BEFORE
-  // `await prisma.$executeRawUnsafe(...)` resolves — the canRegister row would
-  // never be written. This was the smoking-gun bug found after two consecutive
-  // deploys reported SUCCESS but /api/auth/canRegister kept returning 500.
+  //
+  // CRITICAL BUG-LASS: there are TWO common footguns here:
+  //   1. Top-level `process.exit(0)` BEFORE await resolves → process exits,
+  //      UPSERT never lands. (Hit 2026-07-09; fixed via .finally chain.)
+  //   2. Missing `()` between `})` and `.finally` → .finally is called on the
+  //      FUNCTION OBJECT itself (which has no .finally method), not on the
+  //      returned Promise. Result: TypeError at module load, server crashes
+  //      before prisma migrate deploy even gets a chance. (Hit 2026-07-09;
+  //      fixed by adding the `()` invocation.)
+  //
+  // Both must be present: `})()` invokes the async IIFE → returns Promise →
+  // `.finally()` runs after the awaited UPSERT + finally{} + disconnect.
   process.exit(0);
 });

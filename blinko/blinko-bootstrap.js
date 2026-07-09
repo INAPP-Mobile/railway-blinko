@@ -61,3 +61,8 @@
     }
   }
 })();
+
+// Explicit exit: prisma-client's native fd pool can keep the Node 20 event
+// loop alive on certain Postgres edge states. Force-exit so the parent
+// railway-start.sh moves on to seed + main server without delay.
+process.exit(0);

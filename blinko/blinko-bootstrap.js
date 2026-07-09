@@ -60,9 +60,11 @@
       // ignore disconnect errors
     }
   }
-})();
-
-// Explicit exit: prisma-client's native fd pool can keep the Node 20 event
-// loop alive on certain Postgres edge states. Force-exit so the parent
-// railway-start.sh moves on to seed + main server without delay.
-process.exit(0);
+}).finally(() => {
+  // Force-exit AFTER the IIFE chain finishes (UPSERT + finally + disconnect).
+  // CRITICAL: a top-level `process.exit(0)` here would kill the script BEFORE
+  // `await prisma.$executeRawUnsafe(...)` resolves — the canRegister row would
+  // never be written. This was the smoking-gun bug found after two consecutive
+  // deploys reported SUCCESS but /api/auth/canRegister kept returning 500.
+  process.exit(0);
+});

@@ -6,6 +6,7 @@
   },
   "deploy": {
     "numReplicas": 1,
+    "port": 1111,
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",

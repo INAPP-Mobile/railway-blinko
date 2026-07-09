@@ -1,4 +1,4 @@
-FROM docker.io/blinkospace/blinko:1.8.8
+FROM docker.io/blinkospace/blinko@sha256:31c3bc9f4fc00c82328c098c0c1120fe7fe43152a9f3cbc04b0303c32a2e60d3
 
 LABEL org.opencontainers.image.source="https://github.com/INAPP-Mobile/railway-blinko"
 

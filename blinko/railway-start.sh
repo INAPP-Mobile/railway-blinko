@@ -1,12 +1,11 @@
 #!/bin/sh
 # Railway-specific startup wrapper for blinko (docker.io/blinkospace/blinko:1.8.8).
 #
-# Chain (2026-07-09):
-#   1. npx prisma migrate deploy   (creates config table via upstream migrations)
-#   2. node /app/blinko-bootstrap  (idempotent UPSERT isAllowRegister=true)
-#   3. node server/seed.js         (upstream seed)
-#   4. exec node --require /app/blinko-trace.js server/index.js
-#        (TEMPORARY diagnostic preload. Remove once /api/auth/canRegister is 200.)
+# Chain (2026-07-09 — trace instrumentation was rolled back on 2026-07-09T2245):
+#   1. npx prisma migrate deploy
+#   2. node /app/blinko-bootstrap.js  (idempotent UPSERT isAllowRegister=true)
+#   3. node server/seed.js            (upstream seed)
+#   4. exec node server/index.js      (upstream main server)
 
 set -e
 
@@ -20,5 +19,5 @@ node /app/blinko-bootstrap.js
 echo "[railway-blinko] step 3/4: seed"
 node server/seed.js
 
-echo "[railway-blinko] step 4/4: server (with blinko-trace preload)"
-exec node --require /app/blinko-trace.js server/index.js
+echo "[railway-blinko] step 4/4: server"
+exec node server/index.js

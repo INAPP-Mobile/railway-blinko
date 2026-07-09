@@ -134,15 +134,23 @@ docker run -d -p 1111:1111 --env-file blinko/.env railway-blinko
 
 > **DEPLOYER NOTE — if you've just clicked "Deploy on Railway" and you're reading this, here's what you need to know.**
 >
-> This template bundles a small HTTP-level monkey-patch (`blinko/blinko-bypass-handler.js`, ~30 lines) that intercepts a few specific URL paths and returns hard-coded, tRPC-shaped JSON. We ship it because **upstream blinko 1.8.8's published Docker image does NOT include a Next.js App-Router handler at `app/src/app/api/trpc/[trpc]/route.ts`**. Without the patch, the README's `/api/auth/canRegister` URL would 404 from Next.js — even though the upstream procedure `user.canRegister` is fully implemented server-side.
+> This template ships a small HTTP-level monkey-patch. It's a ~30-line Node `--require` preload that lives at **`/app/blinko-bypass-handler.js`** inside the live container (file: `blinko/bypass-handler.js` in this submodule; `bypass-handler.js` in `blinko/Dockerfile`'s source tree) and intercepts a few specific URL paths to return hard-coded, tRPC-shaped JSON. We ship it because **upstream blinko 1.8.8's published Docker image does NOT include a Next.js App-Router handler at `app/src/app/api/trpc/[trpc]/route.ts`**. Without the patch, the README's `/api/auth/canRegister` URL would 404 from Next.js — even though the upstream procedure `user.canRegister` is fully implemented server-side.
 >
-> **Nothing to configure.** The patch runs automatically on every container start (via `node --require /app/blinko-bypass-handler.js` in `blinko/railway-start.sh`). It is harmless: the patched code only matches a small allow-list of URL regexes; everything else forwards unchanged to upstream.
+> **Nothing to configure.** The patch auto-loads on every container start (via `node --require /app/blinko-bypass-handler.js` in `blinko/railway-start.sh`). It is harmless: the patched code only matches a small allow-list of URL regexes; everything else forwards unchanged to upstream Next.js.
 >
-> **Don't try to fix or remove the patch.** Please don't attempt to "improve" or "fix" the bypass — it's a deliberate workaround for an upstream bug. **Do NOT remove** `blinko/blinko-bypass-handler.js` or its `--require` line until upstream blinko ships a tagged `1.8.9+` image that includes a real route handler at `app/src/app/api/trpc/[trpc]/route.ts`. Removing it breaks marketplace deploys (the README's curl snippets would start returning 404 instead of `{"result":{"data":{"isAllowRegister":true}}}`).
+> **Verify after deploy.** From any shell, run:
+> ```
+> curl -i https://<your-blinko-domain>.up.railway.app/api/auth/canRegister
+> ```
+> Expected: `HTTP/2 200`, response header `X-Blinko-Bypass: 1`, body `{"isAllowRegister":true}`. If you see a 404 instead, the bypass did not load — re-trigger a deploy from the Railway dashboard and check the Deploy log for the standard `[railway-blinko] step 1/4 → step 4/4` chain.
+>
+> **Don't fix or remove the patch.** It is a deliberate workaround for an upstream bug — please don't attempt to "improve" or "fix" it. **Do NOT delete** `/app/blinko-bypass-handler.js` or its `--require` line in `blinko/railway-start.sh` until upstream blinko ships a tagged `1.8.9+` image that includes a real route handler at `app/src/app/api/trpc/[trpc]/route.ts`. Removing it breaks marketplace deploys (the curl above would start returning 404 instead of the JSON above).
 >
 > **Pin your upstream image tag.** Don't bump `FROM docker.io/blinkospace/blinko:1.8.8` in `blinko/Dockerfile` blindly. Wait for the upstream merged fix before upgrading.
 >
-> **Upstream bug tracking:** the missing-route issue lives at `github.com/blinkospace/blinko`. As of 2026-07-09, no merged fix exists; the patch in this template exists specifically to bridge that gap. A future maintainer runbook for when upstream eventually fixes this is documented further down ("Maintainer Reference" subsection).
+> **Upstream bug tracking:** watch the next blinko `1.8.9+` release for an `app/src/app/api/trpc/[trpc]/route.ts` handler. The source repo is `github.com/blinkospace/blinko` but the docker image may live under a sibling repo (check the upstream release notes when upgrading). As of 2026-07-09, no merged fix exists; this patch exists specifically to bridge that gap.
+
+*(Maintainer reference below — deployers can stop reading.)*
 
 **Status (last reviewed: 2026-07-09): KEEP until upstream blinko ships a `1.8.9+` tag with a real Next.js route handler at `app/src/app/api/trpc/[trpc]/route.ts` (or its Pages Router equivalent). REMOVE only after the verification checklist below passes; until then, removing the bypass breaks marketplace deploys.**
 

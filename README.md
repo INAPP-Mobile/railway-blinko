@@ -130,6 +130,27 @@ docker run -d -p 1111:1111 --env-file blinko/.env railway-blinko
 | Login not working | Ensure `NEXTAUTH_URL` starts with `https://` (not bare domain) and matches your Railway domain. |
 | AI features not working | Check Blinko docs for AI provider configuration |
 
+## Railway marketplace
+
+A **DRAFT** template derived from this repository lives on Railway's marketplace under workspace `b82233e8-ff27-4ca9-9a30-a7411337a2d9` (INAPP):
+
+- **Template ID**: `8166b543-4dd0-4150-a0b0-d556b3c17d5e`
+- **Auto-generated code**: `IdEPw3`
+- **Current name**: `courteous-magic` (rename via dashboard editor before PUBLISHED)
+- **Status**: `UNPUBLISHED` (draft per AGENTS.md rule 3)
+- **Editor URL**: `https://railway.com/workspace/templates/8166b543-4dd0-4150-a0b0-d556b3c17d5e`
+
+Pre-publish checklist (per `.agents/skills/railway-deployment/SKILL.md` and `dashboard-publish-form-template.md`):
+
+1. Rename to a clean marketplace slug (`blinko` or similar) via the dashboard template editor.
+2. Fill in the required README sections: `# Deploy and Host`, `## About Hosting`, `## Common Use Cases`, `## Dependencies`, `## Why Deploy` (lowercase appname in headings per the form skill).
+3. Add a category enum value (e.g., `Other`).
+4. Verify image URL serves raw SVG (see `2026-06-28-plausible-icon-url-fix.md`).
+5. Confirm `/api/health` returns HTTP 200 on a fresh deploy from the draft's repo (warm-cache healthcheckTimeout is currently `180s`; tighten to `60s` after one warm cycle).
+6. Only after all six pass, transition `UNPUBLISHED → PUBLISHED` via the dashboard.
+
+The draft was created on 2026-07-09 from project `courteous-magic` (`74d36f1e-6fdc-4f34-b426-6f815b4e840c`) after re-sourcing the postgres sibling to `postgres:16-alpine` (image source — functionally equivalent to our submodule's `postgres/Dockerfile` since that file is `FROM postgres:16-alpine` verbatim). Live Prisma data in the postgres volume is preserved.
+
 ## License
 
 Blinko is AGPL-3.0 licensed. Template by [INAPP-Mobile](https://github.com/INAPP-Mobile).

@@ -1,0 +1,14 @@
+{
+  "DATABASE_URL": {
+    "value": "postgresql://postgres:postgres@postgres.railway.internal:5432/blinko",
+    "description": "PostgreSQL connection string. Defaults to a literal credential matched against the sibling postgres service's POSTGRES_PASSWORD. For production, rotate POSTGRES_PASSWORD in the postgres service AND update this URL to match (path component /blinko is the database name created by POSTGRES_DB)."
+  },
+  "NEXTAUTH_SECRET": {
+    "value": "${{secret(64)}}",
+    "description": "Random secret for authentication encryption. Auto-generated on first deploy."
+  },
+  "NEXTAUTH_URL": {
+    "value": "https://${{RAILWAY_PUBLIC_DOMAIN}}",
+    "description": "Public URL of your Blinko instance. Required for auth callbacks. The https:// prefix is mandatory — RAILWAY_PUBLIC_DOMAIN resolves to the bare domain only."
+  }
+}

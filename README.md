@@ -10,15 +10,20 @@ Blinko is an AI-powered, card-based note-taking app with RAG (Retrieval-Augmente
 
 ## About Hosting
 
-Blinko runs as a single container with a Railway-managed PostgreSQL database. Railway provides the compute, TLS at the edge, and a public URL. The service restarts automatically on failures. All notes and AI embeddings are stored in PostgreSQL — no persistent volume required.
+Blinko runs as a two-service stack on Railway:
+
+- **`blinko`** — the main app container (port 1111)
+- **`postgres`** — a sibling PostgreSQL 16 (Alpine) container, mounted with a volume so your notes and AI embeddings persist across deploys
+
+Railway provides the compute, TLS at the edge, and a public URL. The Blinko service restarts automatically on failures. The Postgres service stores all data with persistent volume storage.
 
 ## Why Deploy
 
 - **AI-native notes** — Chat with your knowledge base using RAG. Ask questions and Blinko retrieves relevant notes with AI context.
 - **Card-based UI** — Organize thoughts visually with a modern card interface instead of folders.
 - **17K+ GitHub stars** — One of the fastest-growing open-source AI knowledge tools.
-- **Managed PostgreSQL** — Railway provisions your database with auto-injected connection strings.
-- **Single container** — No sidecars, no vector database, no external services beyond Postgres.
+- **Sibling PostgreSQL** — A persistent, dedicated Postgres container — no shared plugin, no stale credentials.
+- **Volume-backed data** — Notes and embeddings persist across redeploys via a mounted volume.
 
 ## Common Use Cases
 
@@ -28,11 +33,18 @@ Blinko runs as a single container with a Railway-managed PostgreSQL database. Ra
 - **Research assistant** — Store papers, articles, and references then ask AI to synthesize findings.
 - **Second brain** — Build a searchable, AI-augmented personal wiki.
 
-## Dependencies for Blinko
+## Dependencies for blinko
 
 ### Deployment Dependencies
 
-Blinko requires a PostgreSQL database. Add a Railway PostgreSQL service to your project — the connection string is auto-injected via `DATABASE_URL`. No vector database or additional services needed.
+The template deploys two services from a single repo:
+
+| Service | Path | Description |
+|---------|------|-------------|
+| `blinko` | `blinko/Dockerfile` | Main app (port 1111) |
+| `postgres` | `postgres/Dockerfile` | PostgreSQL 16 (Alpine) sibling with persistent volume |
+
+The Railway dashboard creates both services automatically when this template deploys. No external database or third-party service is required.
 
 ---
 
@@ -40,42 +52,82 @@ Blinko requires a PostgreSQL database. Add a Railway PostgreSQL service to your 
 
 - AI-powered RAG note search — chat with your notes
 - Card-based visual organization
-- PostgreSQL backend for all data and embeddings
+- PostgreSQL backend (sibling service) for all data and embeddings
+- Persistent volume storage
 - Pinned Docker image (v1.8.8)
-- One-click deploy with auto-configured database
+- One-click deploy with two services auto-configured
+
+## Volume Mount (CRITICAL)
+
+**The `postgres` service REQUIRES a persistent volume.** In the Railway dashboard:
+
+1. Open the Postgres service tile
+2. Click **+ New Volume**
+3. Set mount path to `/var/lib/postgresql` (the parent path — NOT `/var/lib/postgresql/data`)
+4. The default `PGDATA=/var/lib/postgresql/data` env var lives as a sub-path inside the volume
+
+This parent-mount geometry places the volume's ext4 `lost+found/` directory **outside** PGDATA, sidestepping the `postgres-ssl:18` plugin's initdb crash. See `postgres/.env.example` for the full rationale.
 
 ## Quick Start
 
 1. Click **Deploy on Railway** above
-2. Add a **PostgreSQL** service
-3. Set `NEXTAUTH_SECRET` to a random string
-4. Deploy — Blinko starts in ~60s
-5. Open your Railway URL to start capturing ideas
+2. The template provisions two services + a volume automatically
+3. Open your Railway URL — Blinko starts in ~60s
+4. Sign up and start capturing ideas
 
 ## Environment Variables
 
+### `blinko` service
+
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_URL` | Yes | Auto | PostgreSQL connection (Railway auto-injects) |
-| `NEXTAUTH_SECRET` | Yes | — | Random secret for auth encryption |
-| `NEXTAUTH_URL` | Yes | — | Public URL of your instance |
+| `DATABASE_URL` | Yes | `postgresql://postgres:postgres@postgres.railway.internal:5432/blinko` | Connection string for sibling Postgres |
+| `NEXTAUTH_SECRET` | Yes | `${{secret(64)}}` | Random secret for auth encryption (auto-generated) |
+| `NEXTAUTH_URL` | Yes | `https://${{RAILWAY_PUBLIC_DOMAIN}}` | Public URL of your instance |
 | `PORT` | No | `1111` | Container port (Railway auto-sets) |
+
+### `postgres` service
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `POSTGRES_USER` | Yes | `postgres` | Superuser name |
+| `POSTGRES_PASSWORD` | Yes | `postgres` | Superuser password — defaults to literal `postgres`; rotate in dashboard AND update `DATABASE_URL` on `blinko` to match (see below) |
+| `POSTGRES_DB` | Yes | `blinko` | Database name (matches path component of `DATABASE_URL`) |
+| `PGDATA` | Yes | `/var/lib/postgresql/data` | Data directory (subpath of volume mount) |
+
+## Rotating the Postgres Password
+
+The default literal password (`postgres`) is intentional — kept identical to Blinko's `DATABASE_URL` so marketplace first-time deploys succeed out of the box. **For production, rotate BOTH sides in lockstep:**
+
+1. Open the `postgres` service tile → Variables → `POSTGRES_PASSWORD` → set to a new random secret
+2. Open the `blinko` service tile → Variables → `DATABASE_URL` → update the password segment after `://postgres:` to match
+3. Redeploy `postgres` (or both services)
+
+If only one side is updated, the Blinko app will fail to connect at startup.
 
 ## Local Development
 
 ```bash
 git clone https://github.com/INAPP-Mobile/railway-blinko && cd railway-blinko
-cp .env.example .env && $EDITOR .env
-docker build -t railway-blinko .
-docker run -d -p 1111:1111 --env-file .env railway-blinko
+
+# Start Postgres (needs Docker)
+docker run -d --name blinko-pg -p 5432:5432 \
+  -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=blinko \
+  postgres:16-alpine
+
+# Start Blinko
+cp blinko/.env.example blinko/.env && $EDITOR blinko/.env  # set NEXTAUTH_URL to http://localhost:1111
+docker build -t railway-blinko blinko/
+docker run -d -p 1111:1111 --env-file blinko/.env railway-blinko
 ```
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Database connection failed | Verify `DATABASE_URL` is set and Postgres is running |
-| Login not working | Ensure `NEXTAUTH_SECRET` is set and `NEXTAUTH_URL` matches your Railway domain |
+| Postgres crashes on first boot | Verify the volume is mounted at `/var/lib/postgresql` (parent path), not `/var/lib/postgresql/data`. See `postgres/.env.example`. |
+| Blinko shows "DB connection refused" | Check `DATABASE_URL` matches `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` on the postgres service. If you rotated password, update both sides. |
+| Login not working | Ensure `NEXTAUTH_URL` starts with `https://` (not bare domain) and matches your Railway domain. |
 | AI features not working | Check Blinko docs for AI provider configuration |
 
 ## License

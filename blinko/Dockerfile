@@ -1,6 +1,6 @@
 FROM docker.io/blinkospace/blinko:1.8.8
 
-# rebuild-marker: 2026-07-09T2200-trace-preload
+# rebuild-marker: 2026-07-09T2230-healthcheck-timeout
 LABEL org.opencontainers.image.source="https://github.com/INAPP-Mobile/railway-blinko"
 
 # Railway-specific files layered onto the upstream image:
